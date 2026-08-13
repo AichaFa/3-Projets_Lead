@@ -1,4 +1,4 @@
-# 🎧 Spotify — Cadre de gouvernance des données
+# 🎧 Spotify - Cadre de gouvernance des données
 
 ![Data Governance](https://img.shields.io/badge/Data%20Governance-1DB954?style=for-the-badge&logo=spotify&logoColor=white)
 ![Compliance](https://img.shields.io/badge/Conformit%C3%A9-RGPD%20|%20CCPA%20|%20PCI--DSS-1F3864?style=for-the-badge)
@@ -22,10 +22,10 @@ Ce projet conçoit un cadre de gouvernance pour répondre à ces défis, tout en
 
 ## Objectifs & valeur métier
 
-- **Décloisonner les données** — éliminer les silos entre Marketing, Produit et Ingénierie et établir une source unique de vérité.
-- **Assurer la conformité** — maîtriser le traitement des données personnelles à l'échelle mondiale et réduire les risques légaux et financiers.
-- **Garantir la qualité & l'éthique de l'IA** — surveiller la qualité des données qui alimentent le moteur de recommandation et contrôler les biais algorithmiques.
-- **Déployer un modèle évolutif** — évoluer progressivement d'une gouvernance centralisée vers un **centre d'excellence** fédéré, avec des *Data Stewards* métier embarqués.
+- **Décloisonner les données** - éliminer les silos entre Marketing, Produit et Ingénierie et établir une source unique de vérité.
+- **Assurer la conformité** - maîtriser le traitement des données personnelles à l'échelle mondiale et réduire les risques légaux et financiers.
+- **Garantir la qualité & l'éthique de l'IA** - surveiller la qualité des données qui alimentent le moteur de recommandation et contrôler les biais algorithmiques.
+- **Déployer un modèle évolutif** - évoluer progressivement d'une gouvernance centralisée vers un **centre d'excellence** fédéré, avec des *Data Stewards* métier embarqués.
 
 ---
 
@@ -66,10 +66,10 @@ Le modèle est atteint par une trajectoire progressive :
 
 La coordination centrale préserve une source unique de vérité, tandis que les *Data Stewards* embarqués apportent l'agilité aux métiers.
 
-### Socle technologique — *acheter ou construire*
+### Socle technologique - *acheter ou construire*
 
 - **Acheter** (ce qui ne différencie pas) : Collibra (catalogue), Ataccama ONE (qualité), OneTrust (conformité), Splunk (sécurité).
-- **Construire** (l'avantage propre) : le cœur algorithmique — moteur de recommandation et surveillance des biais.
+- **Construire** (l'avantage propre) : le cœur algorithmique - moteur de recommandation et surveillance des biais.
 
 ---
 
@@ -77,18 +77,18 @@ La coordination centrale préserve une source unique de vérité, tandis que les
 
 Chaque livrable est disponible en version bureautique (Word / PowerPoint) et en **PDF** prévisualisable directement sur GitHub.
 
-- **Évaluation de la maturité** — diagnostic sur 9 dimensions.
-- **Politique de gouvernance** — le cadre de référence en 9 sections.
-- **Organigramme des rôles** — l'organisation cible.
-- **Plan de mise en œuvre** — modèle, outils et projet pilote.
-- **Présentation** — synthèse en diapositives pour l'équipe dirigeante.
-- **Guide de questions-réponses** — anticipation des questions d'un comité de direction.
+- **Évaluation de la maturité** - diagnostic sur 9 dimensions.
+- **Politique de gouvernance** - le cadre de référence en 9 sections.
+- **Organigramme des rôles** - l'organisation cible.
+- **Plan de mise en œuvre** - modèle, outils et projet pilote.
+- **Présentation** - synthèse en diapositives pour l'équipe dirigeante.
+- **Guide de questions-réponses** - anticipation des questions d'un comité de direction.
 
 ---
 
 ## Auteur
 
-**Aïcha FATHELLAH** — GitHub [@AichaFa](https://github.com/AichaFa)
+**Aïcha FATHELLAH** - GitHub [@AichaFa](https://github.com/AichaFa)
 
 ---
 
