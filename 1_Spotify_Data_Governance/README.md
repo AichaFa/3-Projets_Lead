@@ -8,7 +8,7 @@ Conception d'un **cadre complet de gouvernance des données** pour Spotify, trai
 
 ---
 
-## 📌 Contexte
+## Contexte
 
 Spotify, leader mondial du streaming, fait face à trois défis liés à ses données :
 
@@ -20,7 +20,7 @@ Ce projet conçoit un cadre de gouvernance pour répondre à ces défis, tout en
 
 ---
 
-## 🎯 Objectifs & valeur métier
+## Objectifs & valeur métier
 
 - **Décloisonner les données** — éliminer les silos entre Marketing, Produit et Ingénierie et établir une source unique de vérité.
 - **Assurer la conformité** — maîtriser le traitement des données personnelles à l'échelle mondiale et réduire les risques légaux et financiers.
@@ -29,7 +29,7 @@ Ce projet conçoit un cadre de gouvernance pour répondre à ces défis, tout en
 
 ---
 
-## 🧭 Démarche
+## Démarche
 
 | Étape | Objet | Résultat clé |
 |---|---|---|
@@ -40,7 +40,7 @@ Ce projet conçoit un cadre de gouvernance pour répondre à ces défis, tout en
 
 ---
 
-## 🏛️ Le cadre en bref
+## Le cadre en bref
 
 ### Les 9 principes directeurs
 
@@ -73,7 +73,7 @@ La coordination centrale préserve une source unique de vérité, tandis que les
 
 ---
 
-## 📦 Livrables
+## Livrables
 
 Chaque livrable est disponible en version bureautique (Word / PowerPoint) et en **PDF** prévisualisable directement sur GitHub.
 
@@ -86,12 +86,12 @@ Chaque livrable est disponible en version bureautique (Word / PowerPoint) et en 
 
 ---
 
-## 👤 Auteur
+## Auteur
 
 **Aïcha FATHELLAH** — GitHub [@AichaFa](https://github.com/AichaFa)
 
 ---
 
-## ⚠️ Note
+## Note
 
 Spotify est utilisé ici comme cas d'étude illustratif. Ce dépôt est un travail personnel et n'est affilié à Spotify d'aucune manière.
