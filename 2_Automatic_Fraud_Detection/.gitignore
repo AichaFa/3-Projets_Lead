@@ -1,0 +1,24 @@
+# Secrets
+.env
+
+# Données sources (retéléchargeables)
+data/
+
+# Journaux et fichiers générés par Airflow
+logs/
+plugins/
+config/
+
+# Artefacts MLflow en local
+mlruns/
+mlartifacts/
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.venv/
+
+# Système
+Thumbs.db
+.DS_Store
