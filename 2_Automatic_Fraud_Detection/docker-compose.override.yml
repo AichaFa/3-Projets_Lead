@@ -1,5 +1,7 @@
 # Surcharges locales :
 # - monte tous les dossiers nécessaires (dont data/, src/, training/) dans les services Airflow ;
+# - déclare la connexion Airflow vers la base fraud ;
+# - scanne le dossier dags plus souvent (10 s) pour une détection rapide ;
 # - corrige le démarrage de MLflow : prépare les droits du dossier de stockage, puis lance le serveur.
 
 x-mounts: &mounts
@@ -11,15 +13,23 @@ x-mounts: &mounts
   - ./src:/opt/airflow/src
   - ./training:/opt/airflow/training
 
+x-airflow-extra-env: &airflow-extra-env
+  AIRFLOW_CONN_FRAUD_DB: postgresql://fraud:${FRAUD_DB_PASSWORD}@postgres:5432/fraud
+  AIRFLOW__DAG_PROCESSOR__REFRESH_INTERVAL: "10"
+
 services:
   airflow-apiserver:
     volumes: *mounts
+    environment: *airflow-extra-env
   airflow-scheduler:
     volumes: *mounts
+    environment: *airflow-extra-env
   airflow-dag-processor:
     volumes: *mounts
+    environment: *airflow-extra-env
   airflow-triggerer:
     volumes: *mounts
+    environment: *airflow-extra-env
 
   mlflow:
     entrypoint: []
