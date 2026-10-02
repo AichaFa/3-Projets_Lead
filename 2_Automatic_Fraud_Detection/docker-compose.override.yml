@@ -1,11 +1,40 @@
-# Surcharge ciblée : corrige le démarrage de MLflow, qui réutilise l'image Airflow.
+# Surcharges locales :
+# - monte tous les dossiers nécessaires (dont data/, src/, training/) dans les services Airflow ;
+# - corrige le démarrage de MLflow : prépare les droits du dossier de stockage, puis lance le serveur.
+
+x-mounts: &mounts
+  - ./dags:/opt/airflow/dags
+  - ./logs:/opt/airflow/logs
+  - ./config:/opt/airflow/config
+  - ./plugins:/opt/airflow/plugins
+  - ./data:/opt/airflow/data
+  - ./src:/opt/airflow/src
+  - ./training:/opt/airflow/training
+
 services:
+  airflow-apiserver:
+    volumes: *mounts
+  airflow-scheduler:
+    volumes: *mounts
+  airflow-dag-processor:
+    volumes: *mounts
+  airflow-triggerer:
+    volumes: *mounts
+
   mlflow:
     entrypoint: []
+    user: "0:0"
+    volumes:
+      - mlflow-artifacts:/mlflow/artifacts
     command:
-      - mlflow
-      - server
-      - --host=0.0.0.0
-      - --port=5000
-      - --backend-store-uri=postgresql+psycopg2://mlflow:${MLFLOW_DB_PASSWORD}@postgres/mlflow
-      - --artifacts-destination=/mlflow/artifacts
+      - bash
+      - -c
+      - |
+        mkdir -p /mlflow/artifacts
+        chown -R 50000:0 /mlflow/artifacts
+        exec mlflow server \
+          --host=0.0.0.0 \
+          --port=5000 \
+          --backend-store-uri=postgresql+psycopg2://mlflow:${MLFLOW_DB_PASSWORD}@postgres/mlflow \
+          --artifacts-destination=/mlflow/artifacts \
+          --serve-artifacts
