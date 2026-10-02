@@ -48,7 +48,9 @@ def ingestion_paiements():
             charge = json.loads(charge)
         colonnes = charge["columns"]
         valeurs = charge["data"][0]
-        return dict(zip(colonnes, valeurs))
+        paiement = dict(zip(colonnes, valeurs))
+        paiement["_debut_traitement"] = time.monotonic()
+        return paiement
 
     @task
     def controler_qualite(paiement: dict) -> dict:
@@ -63,14 +65,15 @@ def ingestion_paiements():
         if not paiement.get("trans_num"):
             motifs.append("numero de transaction absent")
 
+        debut = paiement.pop("_debut_traitement", None)
         if motifs:
             hook = PostgresHook(postgres_conn_id=CONN_ID)
             hook.run(
                 "INSERT INTO quarantaine (motif, charge_utile) VALUES (%s, %s)",
                 parameters=("; ".join(motifs), json.dumps(paiement)),
             )
-            return {"valide": False, "paiement": paiement}
-        return {"valide": True, "paiement": paiement}
+            return {"valide": False, "paiement": paiement, "debut": debut}
+        return {"valide": True, "paiement": paiement, "debut": debut}
 
     @task
     def predire(resultat_qualite: dict) -> dict:
@@ -154,19 +157,21 @@ def ingestion_paiements():
     @task
     def suivre(resultat_qualite: dict, resultat_charge: dict) -> None:
         """Écrit une ligne de suivi d'exécution."""
-        valide = 1 if resultat_qualite["valide"] else 0
         rejete = 0 if resultat_qualite["valide"] else 1
         charge = 1 if resultat_charge.get("charge") else 0
         fraude = resultat_charge.get("fraude", 0)
+
+        debut = resultat_qualite.get("debut")
+        duree_ms = int((time.monotonic() - debut) * 1000) if debut is not None else None
 
         hook = PostgresHook(postgres_conn_id=CONN_ID)
         hook.run(
             """
             INSERT INTO suivi_executions
-                (recus, valides, rejetes, fraudes_detectees)
-            VALUES (%s, %s, %s, %s)
+                (recus, valides, rejetes, fraudes_detectees, duree_ms)
+            VALUES (%s, %s, %s, %s, %s)
             """,
-            parameters=(1, charge, rejete, fraude),
+            parameters=(1, charge, rejete, fraude, duree_ms),
         )
 
     paiement = extraire()
