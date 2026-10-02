@@ -1,9 +1,10 @@
-# Socle de l'infrastructure : PostgreSQL et Airflow 3 en mode LocalExecutor.
+# Socle de l'infrastructure : PostgreSQL, Airflow 3 (LocalExecutor) et MLflow.
 name: fraud-detection
 
 x-airflow-common:
   &airflow-common
-  image: apache/airflow:3.3.2
+  image: fraud-detection-airflow:3.3.2
+  build: ./airflow
   environment:
     &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
@@ -130,5 +131,24 @@ services:
       airflow-init:
         condition: service_completed_successfully
 
+  mlflow:
+    image: fraud-detection-airflow:3.3.2
+    build: ./airflow
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri postgresql+psycopg2://mlflow:${MLFLOW_DB_PASSWORD}@postgres/mlflow
+      --artifacts-destination /mlflow/artifacts
+    volumes:
+      - mlflow-artifacts:/mlflow/artifacts
+    ports:
+      - "127.0.0.1:5000:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: always
+
 volumes:
   postgres-data:
+  mlflow-artifacts:

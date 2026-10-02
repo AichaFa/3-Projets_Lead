@@ -1,0 +1,11 @@
+# Surcharge ciblée : corrige le démarrage de MLflow, qui réutilise l'image Airflow.
+services:
+  mlflow:
+    entrypoint: []
+    command:
+      - mlflow
+      - server
+      - --host=0.0.0.0
+      - --port=5000
+      - --backend-store-uri=postgresql+psycopg2://mlflow:${MLFLOW_DB_PASSWORD}@postgres/mlflow
+      - --artifacts-destination=/mlflow/artifacts
