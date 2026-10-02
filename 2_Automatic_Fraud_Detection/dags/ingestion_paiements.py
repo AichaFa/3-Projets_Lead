@@ -8,6 +8,7 @@ dans la base fraud. Une ligne de suivi est écrite à chaque passage.
 from __future__ import annotations
 
 import json
+import logging
 import sys
 import time
 from datetime import datetime
@@ -16,6 +17,7 @@ import pendulum
 import requests
 from airflow.decorators import dag, task
 from airflow.providers.postgres.hooks.postgres import PostgresHook
+from airflow.sdk import Variable
 
 sys.path.insert(0, "/opt/airflow/src")
 
@@ -23,6 +25,8 @@ URL_API = "https://sdacelo-real-time-fraud-detection.hf.space/current-transactio
 CONN_ID = "fraud_db"
 NOM_MODELE = "fraud-detector"
 URI_MLFLOW = "http://mlflow:5000"
+
+logger = logging.getLogger("ingestion_paiements")
 
 
 @dag(
@@ -87,6 +91,11 @@ def ingestion_paiements():
         colonnes_modele = [c for c in prepare.columns if c != "is_fraud"]
         prediction = int(modele.predict(prepare[colonnes_modele])[0])
 
+        # Interrupteur de demonstration : force une fraude pour tester l alerte.
+        # Active via la variable Airflow "forcer_fraude" = "1". Inactif par defaut.
+        if Variable.get("forcer_fraude", default="0") == "1":
+            prediction = 1
+
         ligne = prepare.iloc[0]
         return {
             "ignore": False,
@@ -103,6 +112,20 @@ def ingestion_paiements():
             "is_fraud_reel": int(paiement["is_fraud"]) if paiement.get("is_fraud") is not None else None,
             "trans_num": paiement.get("trans_num"),
         }
+
+    @task
+    def alerter(donnee: dict) -> dict:
+        """Émet une alerte visible dans les journaux si une fraude est détectée."""
+        if donnee.get("ignore") or int(donnee.get("prediction", 0)) != 1:
+            return donnee
+
+        bordure = "=" * 48
+        logger.warning(bordure)
+        logger.warning("  ALERTE FRAUDE DETECTEE")
+        logger.warning("  Montant : %.2f  -  Categorie : %s", donnee["amt"], donnee["category"])
+        logger.warning("  Carte : %s  -  Transaction : %s", donnee["cc_pseudo"], donnee["trans_num"])
+        logger.warning(bordure)
+        return donnee
 
     @task
     def charger(donnee: dict) -> dict:
@@ -149,7 +172,8 @@ def ingestion_paiements():
     paiement = extraire()
     qualite = controler_qualite(paiement)
     donnee = predire(qualite)
-    charge = charger(donnee)
+    donnee_alertee = alerter(donnee)
+    charge = charger(donnee_alertee)
     suivre(qualite, charge)
 
 
