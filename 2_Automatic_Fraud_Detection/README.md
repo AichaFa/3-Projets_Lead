@@ -18,7 +18,11 @@ L'objectif n'est pas seulement de construire un modèle, mais une chaîne de tra
 
 Démonstration vidéo de l'infrastructure en fonctionnement (glisser la vidéo ici depuis l'éditeur GitHub) :
 
-LIEN_VIDEO_ICI
+
+
+https://github.com/user-attachments/assets/c2e2fc2f-bcc7-406a-8035-3166289e9667
+
+
 
 Interfaces locales du projet :
 
