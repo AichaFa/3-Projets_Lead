@@ -40,7 +40,13 @@ L'équipe métier a exprimé deux besoins, auxquels l'infrastructure répond dir
 ## Architecture
 
 L'ensemble fonctionne en local grâce à Docker. Le parcours de la donnée suit un processus ETL (Extraire, Transformer, Charger), déclenché chaque minute par Airflow.
+### Vue d'ensemble
 
+![Vue d'ensemble de l'infrastructure](docs/captures/architecture_ensemble.png)
+
+### Le flux ETL, chaque minute
+
+![Flux ETL du DAG d'ingestion](docs/captures/flux_etl.png)
     Sources (historique + API temps réel)
         -> Entraînement du modèle (scikit-learn), rangé dans MLflow
         -> DAG d'ingestion Airflow (chaque minute) : extraction, contrôle
