@@ -22,3 +22,5 @@ __pycache__/
 # Système
 Thumbs.db
 .DS_Store
+# Video originale non compressee (trop lourde pour GitHub)
+presentation/Détection*.mp4
