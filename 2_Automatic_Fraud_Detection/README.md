@@ -16,7 +16,7 @@ L'objectif n'est pas seulement de construire un modèle, mais une chaîne de tra
 
 ## Démonstration et liens
 
-Démonstration vidéo de l'infrastructure en fonctionnement (glisser la vidéo ici depuis l'éditeur GitHub) :
+Démonstration vidéo de l'infrastructure en fonctionnement :
 
 
 
