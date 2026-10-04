@@ -1,0 +1,381 @@
+# Architecture de démonstration - Stripe Business Case
+# Déploiement local (on-premise) : base OLTP et son réplica, capture des changements (CDC),
+# file de messages, entrepôt OLAP, base NoSQL, orchestration et interfaces de consultation.
+
+name: stripe
+
+x-healthcheck-defaults: &healthcheck-defaults
+  interval: 10s
+  timeout: 5s
+  retries: 12
+
+services:
+
+  # Base transactionnelle (OLTP) : PostgreSQL en mode réplication logique pour Debezium
+  # max_slot_wal_keep_size : plafond du journal conservé pour un slot non lu (protection du disque)
+  # TLS : la clé privée est copiée avec les droits exigés par PostgreSQL (propriétaire postgres,
+  # lecture réservée), un montage depuis Windows ne permettant pas de les appliquer directement
+  postgres-oltp:
+    image: postgres:17
+    container_name: stripe-postgres-oltp
+    command:
+      - bash
+      - -c
+      - |
+        install -d -o postgres -g postgres -m 700 /var/lib/postgresql/tls
+        install -o postgres -g postgres -m 600 /certificats/serveur.key /var/lib/postgresql/tls/serveur.key
+        install -o postgres -g postgres -m 644 /certificats/serveur.crt /var/lib/postgresql/tls/serveur.crt
+        exec docker-entrypoint.sh postgres \
+          -c wal_level=logical \
+          -c max_wal_senders=10 \
+          -c max_replication_slots=10 \
+          -c max_slot_wal_keep_size=2GB \
+          -c hba_file=/etc/postgresql/pg_hba.conf \
+          -c ssl=on \
+          -c ssl_cert_file=/var/lib/postgresql/tls/serveur.crt \
+          -c ssl_key_file=/var/lib/postgresql/tls/serveur.key \
+          -c ssl_min_protocol_version=TLSv1.2
+    environment:
+      POSTGRES_DB: stripe_oltp
+      POSTGRES_USER: ${OLTP_ADMIN_USER}
+      POSTGRES_PASSWORD: ${OLTP_ADMIN_PASSWORD}
+      REPLICATION_PASSWORD: ${REPLICATION_PASSWORD}
+      CDC_PASSWORD: ${CDC_PASSWORD}
+      APP_PAIEMENTS_PASSWORD: ${APP_PAIEMENTS_PASSWORD}
+      FLUX_TEMPS_REEL_PASSWORD: ${FLUX_TEMPS_REEL_PASSWORD}
+      ORCHESTRATEUR_OLTP_PASSWORD: ${ORCHESTRATEUR_OLTP_PASSWORD}
+    volumes:
+      - oltp-data:/var/lib/postgresql/data
+      - ./04_oltp_postgresql/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+      - ./04_oltp_postgresql:/docker-entrypoint-initdb.d:ro
+      - ./08_securite_conformite/certificats/serveur.crt:/certificats/serveur.crt:ro
+      - ./08_securite_conformite/certificats/serveur.key:/certificats/serveur.key:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      <<: *healthcheck-defaults
+
+  # Réplica en lecture seule : copie continue de la base OLTP (réplication physique en flux)
+  postgres-oltp-replica:
+    image: postgres:17
+    container_name: stripe-postgres-oltp-replica
+    user: postgres
+    depends_on:
+      postgres-oltp:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${REPLICATION_PASSWORD}
+    command:
+      - bash
+      - -c
+      - |
+        if [ ! -s /var/lib/postgresql/data/PG_VERSION ]; then
+          until pg_basebackup -h postgres-oltp -U replicator -D /var/lib/postgresql/data -Fp -Xs -R; do
+            echo "Base primaire indisponible, nouvelle tentative"
+            rm -rf /var/lib/postgresql/data/*
+            sleep 3
+          done
+          chmod 0700 /var/lib/postgresql/data
+        fi
+        exec postgres
+    volumes:
+      - oltp-replica-data:/var/lib/postgresql/data
+    ports:
+      - "15433:5432"
+
+  # Entrepôt analytique (OLAP) : schéma en étoile
+  postgres-dwh:
+    image: postgres:17
+    container_name: stripe-postgres-dwh
+    environment:
+      POSTGRES_DB: stripe_dwh
+      POSTGRES_USER: ${DWH_ADMIN_USER}
+      POSTGRES_PASSWORD: ${DWH_ADMIN_PASSWORD}
+      CHARGEMENT_DWH_PASSWORD: ${CHARGEMENT_DWH_PASSWORD}
+      ANALYSTE_DWH_PASSWORD: ${ANALYSTE_DWH_PASSWORD}
+      AUDITEUR_DWH_PASSWORD: ${AUDITEUR_DWH_PASSWORD}
+    volumes:
+      - dwh-data:/var/lib/postgresql/data
+      - ./05_olap_entrepot:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "15434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      <<: *healthcheck-defaults
+
+  # Base de métadonnées propre à Airflow (non exposée)
+  postgres-airflow:
+    image: postgres:17
+    container_name: stripe-postgres-airflow
+    environment:
+      POSTGRES_DB: airflow
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: ${AIRFLOW_DB_PASSWORD}
+    volumes:
+      - airflow-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      <<: *healthcheck-defaults
+
+  # Base NoSQL orientée documents
+  mongodb:
+    image: mongo:8.0
+    container_name: stripe-mongodb
+    command: ["--wiredTigerCacheSizeGB", "0.5"]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: stripe_nosql
+      MONGO_GENERATEUR_PASSWORD: ${MONGO_GENERATEUR_PASSWORD}
+      MONGO_FLUX_PASSWORD: ${MONGO_FLUX_PASSWORD}
+      MONGO_ORCHESTRATEUR_PASSWORD: ${MONGO_ORCHESTRATEUR_PASSWORD}
+    volumes:
+      - mongo-data:/data/db
+      - ./06_nosql_mongodb:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "27017:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      <<: *healthcheck-defaults
+
+  # File de messages : Kafka en mode KRaft (sans ZooKeeper), un seul nœud
+  kafka:
+    image: apache/kafka:4.3.1
+    container_name: stripe-kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_SHARE_COORDINATOR_STATE_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_SHARE_COORDINATOR_STATE_TOPIC_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_HEAP_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "29092:29092"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 15s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
+
+  # Capture des changements (CDC) : Kafka Connect avec les connecteurs Debezium
+  connect:
+    image: quay.io/debezium/connect:3.7
+    container_name: stripe-debezium-connect
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres-oltp:
+        condition: service_healthy
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: stripe-connect
+      CONFIG_STORAGE_TOPIC: connect_configs
+      OFFSET_STORAGE_TOPIC: connect_offsets
+      STATUS_STORAGE_TOPIC: connect_statuses
+      CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE: "false"
+      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+      # Secrets lus dans les variables d'environnement (${env:NOM}), limités aux variables CDC_
+      CONNECT_CONFIG_PROVIDERS: env
+      CONNECT_CONFIG_PROVIDERS_ENV_CLASS: org.apache.kafka.common.config.provider.EnvVarConfigProvider
+      CONNECT_CONFIG_PROVIDERS_ENV_PARAM_ALLOWLIST_PATTERN: "^CDC_.*"
+      CDC_PASSWORD: ${CDC_PASSWORD}
+      HEAP_OPTS: "-Xms256m -Xmx768m"
+    volumes:
+      - ./08_securite_conformite/certificats/ca.crt:/certificats/ca.crt:ro
+    ports:
+      - "18083:8083"
+
+  # Orchestration des traitements par lots (image officielle complétée des pilotes PostgreSQL et MongoDB)
+  airflow:
+    build: ./07_pipeline/airflow
+    image: stripe-airflow:3.3.1
+    container_name: stripe-airflow
+    command: standalone
+    depends_on:
+      postgres-airflow:
+        condition: service_healthy
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${AIRFLOW_DB_PASSWORD}@postgres-airflow:5432/airflow
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: "admin:admin"
+      # Connexions utilisées par les chaînes de tâches
+      OLTP_HOTE: postgres-oltp
+      OLTP_BASE: stripe_oltp
+      OLTP_UTILISATEUR: svc_airflow
+      OLTP_MOT_DE_PASSE: ${ORCHESTRATEUR_OLTP_PASSWORD}
+      DWH_HOTE: postgres-dwh
+      DWH_BASE: stripe_dwh
+      DWH_UTILISATEUR: svc_airflow_dwh
+      DWH_MOT_DE_PASSE: ${CHARGEMENT_DWH_PASSWORD}
+      MONGO_URL: mongodb://svc_airflow:${MONGO_ORCHESTRATEUR_PASSWORD}@mongodb:27017/stripe_nosql?authSource=stripe_nosql
+      CONNECT_URL: http://connect:8083
+      SERVICE_ML_URL: http://service-ml:8000
+      OLTP_SSLMODE: verify-full
+      OLTP_SSLROOTCERT: /certificats/ca.crt
+    volumes:
+      - ./08_securite_conformite/certificats/ca.crt:/certificats/ca.crt:ro
+      - ./07_pipeline/dags:/opt/airflow/dags
+      - ./08_securite_conformite/rapports:/opt/airflow/rapports
+      - airflow-logs:/opt/airflow/logs
+    ports:
+      - "18080:8080"
+
+  # Générateur de données fictives : mode historique (ponctuel) et mode direct (continu)
+  # Profil « pipeline » : démarrage uniquement sur demande explicite
+  generateur:
+    build: ./07_pipeline/generateur
+    image: stripe-generateur:1.0
+    container_name: stripe-generateur
+    profiles: ["pipeline"]
+    depends_on:
+      postgres-oltp:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    environment:
+      OLTP_HOTE: postgres-oltp
+      OLTP_BASE: stripe_oltp
+      OLTP_UTILISATEUR: svc_generateur
+      OLTP_MOT_DE_PASSE: ${APP_PAIEMENTS_PASSWORD}
+      MONGO_URL: mongodb://svc_generateur:${MONGO_GENERATEUR_PASSWORD}@mongodb:27017/stripe_nosql?authSource=stripe_nosql
+      CLE_CHIFFREMENT_EMAIL: ${CLE_CHIFFREMENT_EMAIL}
+      INTERVALLE_SECONDES: "2"
+      OLTP_SSLMODE: verify-full
+      OLTP_SSLROOTCERT: /certificats/ca.crt
+    volumes:
+      - ./08_securite_conformite/certificats/ca.crt:/certificats/ca.crt:ro
+    restart: unless-stopped
+
+  # Entraînement du modèle de fraude (ponctuel) ; image partagée avec le consommateur temps réel
+  entrainement:
+    build: ./07_pipeline/ml
+    image: stripe-ml:1.0
+    container_name: stripe-entrainement
+    profiles: ["pipeline"]
+    depends_on:
+      postgres-oltp:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    environment:
+      OLTP_HOTE: postgres-oltp
+      OLTP_BASE: stripe_oltp
+      OLTP_UTILISATEUR: svc_flux
+      OLTP_MOT_DE_PASSE: ${FLUX_TEMPS_REEL_PASSWORD}
+      MONGO_URL: mongodb://svc_flux:${MONGO_FLUX_PASSWORD}@mongodb:27017/stripe_nosql?authSource=stripe_nosql
+      OLTP_SSLMODE: verify-full
+      OLTP_SSLROOTCERT: /certificats/ca.crt
+    volumes:
+      - ./08_securite_conformite/certificats/ca.crt:/certificats/ca.crt:ro
+    command: ["entrainement.py"]
+
+  # Consommateur temps réel : détection de fraude et personnalisation pour chaque nouveau paiement
+  consommateur:
+    build: ./07_pipeline/ml
+    image: stripe-ml:1.0
+    container_name: stripe-consommateur
+    profiles: ["pipeline"]
+    depends_on:
+      postgres-oltp:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      OLTP_HOTE: postgres-oltp
+      OLTP_BASE: stripe_oltp
+      OLTP_UTILISATEUR: svc_flux
+      OLTP_MOT_DE_PASSE: ${FLUX_TEMPS_REEL_PASSWORD}
+      MONGO_URL: mongodb://svc_flux:${MONGO_FLUX_PASSWORD}@mongodb:27017/stripe_nosql?authSource=stripe_nosql
+      KAFKA_SERVEURS: kafka:9092
+      KAFKA_SUJET: stripe.public.transactions
+      KAFKA_GROUPE: consommateur-temps-reel
+      OLTP_SSLMODE: verify-full
+      OLTP_SSLROOTCERT: /certificats/ca.crt
+    volumes:
+      - ./08_securite_conformite/certificats/ca.crt:/certificats/ca.crt:ro
+    command: ["consommateur.py"]
+    restart: unless-stopped
+
+  # Service d'entraînement et de suivi des modèles (interface web interne, appelée par Airflow)
+  # Aucun port publié : accessible uniquement depuis le réseau interne Docker
+  service-ml:
+    build: ./07_pipeline/ml
+    image: stripe-ml:1.0
+    container_name: stripe-service-ml
+    depends_on:
+      postgres-oltp:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    environment:
+      OLTP_HOTE: postgres-oltp
+      OLTP_BASE: stripe_oltp
+      OLTP_UTILISATEUR: svc_flux
+      OLTP_MOT_DE_PASSE: ${FLUX_TEMPS_REEL_PASSWORD}
+      MONGO_URL: mongodb://svc_flux:${MONGO_FLUX_PASSWORD}@mongodb:27017/stripe_nosql?authSource=stripe_nosql
+      OLTP_SSLMODE: verify-full
+      OLTP_SSLROOTCERT: /certificats/ca.crt
+    volumes:
+      - ./08_securite_conformite/certificats/ca.crt:/certificats/ca.crt:ro
+    entrypoint: ["uvicorn", "service_ml:app", "--host", "0.0.0.0", "--port", "8000"]
+    restart: unless-stopped
+
+  # Interfaces web de consultation
+  kafka-ui:
+    image: ghcr.io/kafbat/kafka-ui:latest
+    container_name: stripe-kafka-ui
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_CLUSTERS_0_NAME: stripe-local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME: debezium
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS: http://connect:8083
+    ports:
+      - "8085:8080"
+
+  adminer:
+    image: adminer:latest
+    container_name: stripe-adminer
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres-oltp
+    ports:
+      - "8081:8080"
+
+  mongo-express:
+    image: mongo-express:latest
+    container_name: stripe-mongo-express
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongodb:27017/
+      ME_CONFIG_BASICAUTH: "true"
+      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USER}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASSWORD}
+    ports:
+      - "18082:8081"
+
+volumes:
+  oltp-data:
+  oltp-replica-data:
+  dwh-data:
+  airflow-db-data:
+  airflow-logs:
+  mongo-data:

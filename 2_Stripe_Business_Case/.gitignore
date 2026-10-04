@@ -1,0 +1,14 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.ipynb_checkpoints/
+
+# Journaux d'exécution
+logs/
+
+# Clés privées des certificats TLS (seuls les certificats publics peuvent être versionnés)
+*.key

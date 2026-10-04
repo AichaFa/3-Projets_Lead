@@ -1,0 +1,8 @@
+psycopg[binary]==3.3.6
+pymongo==4.18.2
+scikit-learn==1.9.1
+numpy==2.5.3
+joblib==1.6.0
+confluent-kafka==2.15.1
+fastapi==0.142.2
+uvicorn==0.54.0
