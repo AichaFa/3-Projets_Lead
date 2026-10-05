@@ -1,0 +1,1093 @@
+{
+  "uid": "supervision-infrastructure",
+  "title": "Supervision de l'infrastructure de données",
+  "description": "Flux de paiements, réplication, capture des changements, alimentation de l'entrepôt et performances",
+  "tags": [
+    "stripe",
+    "supervision",
+    "infrastructure"
+  ],
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "schemaVersion": 39,
+  "version": 2,
+  "editable": false,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "À propos de ce tableau de bord",
+      "gridPos": {
+        "h": 4,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "Surveillance de l'infrastructure de données : **flux de paiements**, **réplication et capture des changements**, **alimentation de l'entrepôt** et **performances**. Couleurs des indicateurs : vert = normal, orange = à surveiller, rouge = intervention nécessaire. Le titre de chaque indicateur affiche sa description au survol. Comptes de lecture seule dédiés, sans accès aux données personnelles ; connexion chiffrée (TLS) à la base transactionnelle."
+      }
+    },
+    {
+      "id": 2,
+      "type": "row",
+      "title": "Flux de paiements (base transactionnelle)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 4
+      },
+      "panels": []
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Paiements enregistrés par minute",
+      "description": "Nombre de paiements enregistrés chaque minute, et parmi eux ceux bloqués par le modèle de fraude (score d'au moins 0,8). Une chute brutale signale un incident d'enregistrement ; un pic de paiements bloqués, une vague de fraude ou une dérive du modèle.",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "caisse_oltp"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Paiements"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2E75B6"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Paiements bloqués"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#C00000"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "caisse_oltp"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT $__timeGroupAlias(date_heure, '1m'),\n       count(*) AS \"Paiements\",\n       count(*) FILTER (WHERE score_anomalie >= 0.8) AS \"Paiements bloqués\"\nFROM transactions\nWHERE $__timeFilter(date_heure)\nGROUP BY 1\nORDER BY 1"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Part de paiements bloqués (dernière heure)",
+      "description": "Pourcentage des paiements de la dernière heure dont le score de fraude atteint 0,8. À l'évaluation, cette part était de 1,2 % : un écart durable signale une dérive du modèle ou une attaque en cours.",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "caisse_oltp"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 12,
+        "y": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#548235",
+                "value": null
+              },
+              {
+                "color": "#ED7D31",
+                "value": 5
+              },
+              {
+                "color": "#C00000",
+                "value": 15
+              }
+            ]
+          },
+          "decimals": 1,
+          "noValue": "Aucun paiement"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "caisse_oltp"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT round(100.0 * count(*) FILTER (WHERE score_anomalie >= 0.8) / NULLIF(count(*), 0), 1) AS \"Part bloquée\"\nFROM transactions\nWHERE date_heure >= now() - interval '1 hour'"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Paiements en attente de score",
+      "description": "Paiements de la dernière heure, enregistrés depuis plus de 30 secondes, qui n'ont pas encore reçu de score de fraude. Une valeur positive signale un consommateur temps réel arrêté ou en retard.",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "caisse_oltp"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 18,
+        "y": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#548235",
+                "value": null
+              },
+              {
+                "color": "#ED7D31",
+                "value": 1
+              },
+              {
+                "color": "#C00000",
+                "value": 20
+              }
+            ]
+          },
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "caisse_oltp"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT count(*) AS \"En attente\"\nFROM transactions\nWHERE score_anomalie IS NULL\n  AND date_heure BETWEEN now() - interval '1 hour' AND now() - interval '30 seconds'"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Paiements de la dernière heure",
+      "description": "Volume de paiements enregistrés au cours de la dernière heure.",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "caisse_oltp"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 12,
+        "y": 10
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#1F3864",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "caisse_oltp"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT count(*) AS \"Paiements\"\nFROM transactions\nWHERE date_heure >= now() - interval '1 hour'"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "row",
+      "title": "Réplication et capture des changements",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 15
+      },
+      "panels": []
+    },
+    {
+      "id": 8,
+      "type": "stat",
+      "title": "Retard du réplica",
+      "description": "Volume du journal des transactions que le réplica n'a pas encore rejoué. Un retard qui grandit expose à une perte de données en cas de bascule sur le réplica.",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "caisse_oltp"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 16
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#548235",
+                "value": null
+              },
+              {
+                "color": "#ED7D31",
+                "value": 1048576
+              },
+              {
+                "color": "#C00000",
+                "value": 104857600
+              }
+            ]
+          },
+          "decimals": 1,
+          "noValue": "Réplica déconnecté"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "caisse_oltp"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn) AS \"Retard\"\nFROM pg_stat_replication\nWHERE pid NOT IN (SELECT active_pid FROM pg_replication_slots WHERE slot_type = 'logical' AND active_pid IS NOT NULL)"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "stat",
+      "title": "Retard de lecture de Debezium",
+      "description": "Volume du journal conservé pour Debezium et pas encore lu. Il est plafonné à 2 Go (max_slot_wal_keep_size) : au-delà, la capture serait interrompue et une resynchronisation nécessaire.",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "caisse_oltp"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 6,
+        "y": 16
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#548235",
+                "value": null
+              },
+              {
+                "color": "#ED7D31",
+                "value": 10485760
+              },
+              {
+                "color": "#C00000",
+                "value": 104857600
+              }
+            ]
+          },
+          "decimals": 1,
+          "noValue": "Slot absent"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "caisse_oltp"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT pg_wal_lsn_diff(pg_current_wal_lsn(), confirmed_flush_lsn) AS \"Retard\"\nFROM pg_replication_slots\nWHERE slot_name = 'slot_stripe_cdc'"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "stat",
+      "title": "Capture des changements (Debezium)",
+      "description": "État de la connexion de Debezium à son slot de réplication. « Déconnecté » signifie que les nouveaux paiements ne sont plus transmis à Kafka : ils s'accumulent dans le journal jusqu'à la reprise.",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "caisse_oltp"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 12,
+        "y": 16
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#C00000",
+                "value": null
+              },
+              {
+                "color": "#548235",
+                "value": 1
+              }
+            ]
+          },
+          "decimals": 0,
+          "noValue": "Slot absent",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Déconnecté",
+                  "color": "#C00000",
+                  "index": 0
+                },
+                "1": {
+                  "text": "Connecté",
+                  "color": "#548235",
+                  "index": 1
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "caisse_oltp"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT CASE WHEN active THEN 1 ELSE 0 END AS \"État\"\nFROM pg_replication_slots\nWHERE slot_name = 'slot_stripe_cdc'"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "stat",
+      "title": "Connexions réseau non chiffrées",
+      "description": "Nombre de connexions réseau à la base transactionnelle sans chiffrement TLS. La base les refuse ; toute valeur non nulle signalerait une règle d'accès modifiée.",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "caisse_oltp"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 18,
+        "y": 16
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#548235",
+                "value": null
+              },
+              {
+                "color": "#C00000",
+                "value": 1
+              }
+            ]
+          },
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "caisse_oltp"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT count(*) FILTER (WHERE NOT s.ssl) AS \"Non chiffrées\"\nFROM pg_stat_activity a\nJOIN pg_stat_ssl s ON s.pid = a.pid\nWHERE a.client_addr IS NOT NULL"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "table",
+      "title": "Connexions réseau à la base transactionnelle",
+      "description": "Comptes connectés à la base transactionnelle, nombre de connexions, chiffrement et version du protocole. Un compte inattendu ou une connexion non chiffrée appelle une vérification.",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "caisse_oltp"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 21
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "caisse_oltp"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT a.usename AS \"Compte\",\n       count(*) AS \"Connexions\",\n       CASE WHEN bool_and(s.ssl) THEN 'oui' ELSE 'non' END AS \"Toutes chiffrées\",\n       string_agg(DISTINCT s.version, ', ') AS \"Protocole\"\nFROM pg_stat_activity a\nJOIN pg_stat_ssl s ON s.pid = a.pid\nWHERE a.client_addr IS NOT NULL\nGROUP BY a.usename\nORDER BY a.usename"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "type": "row",
+      "title": "Alimentation de l'entrepôt analytique",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 28
+      },
+      "panels": []
+    },
+    {
+      "id": 14,
+      "type": "stat",
+      "title": "Minutes depuis le dernier passage du chargement",
+      "description": "Temps écoulé depuis la dernière exécution du chargement incrémental (Airflow, toutes les 15 minutes), qu'elle ait copié des paiements ou non. Au-delà de 20 minutes, un passage a été manqué ; au-delà de 35, la chaîne est probablement arrêtée.",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "entrepot_dwh"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 0,
+        "y": 29
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "m",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#548235",
+                "value": null
+              },
+              {
+                "color": "#ED7D31",
+                "value": 20
+              },
+              {
+                "color": "#C00000",
+                "value": 35
+              }
+            ]
+          },
+          "decimals": 0,
+          "noValue": "Jamais chargé"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "entrepot_dwh"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT round(extract(epoch FROM now() - date_execution) / 60) AS \"Minutes\"\nFROM suivi_chargements\nWHERE flux = 'transactions'"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "type": "stat",
+      "title": "Paiements relus au dernier passage",
+      "description": "Nombre de paiements relus dans la base transactionnelle lors du dernier passage du chargement. Chaque passage relit par sécurité les 5 minutes précédant le dernier paiement chargé (fenêtre de recouvrement) : une valeur non nulle sans nouveau paiement correspond à ces relectures, réécrites à l'identique sans doublon.",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "entrepot_dwh"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 0,
+        "y": 34
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#1F3864",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "entrepot_dwh"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT nb_lignes AS \"Paiements\"\nFROM suivi_chargements\nWHERE flux = 'transactions'"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "Paiements chargés dans l'entrepôt par heure",
+      "description": "Nombre de lignes écrites ou mises à jour dans la table de faits, par heure de chargement. Une interruption de la courbe pendant que des paiements arrivent signale un chargement bloqué.",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "entrepot_dwh"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 16,
+        "x": 8,
+        "y": 29
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Paiements chargés"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#1F3864"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "entrepot_dwh"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT $__timeGroupAlias(date_chargement, '1h'),\n       count(*) AS \"Paiements chargés\"\nFROM fait_transactions\nWHERE $__timeFilter(date_chargement)\nGROUP BY 1\nORDER BY 1"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "type": "row",
+      "title": "Performances et capacité",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 39
+      },
+      "panels": []
+    },
+    {
+      "id": 18,
+      "type": "stat",
+      "title": "Lectures servies par le cache (base transactionnelle)",
+      "description": "Part des lectures de blocs servies par la mémoire plutôt que par le disque, depuis le démarrage. En dessous de 99 %, la mémoire allouée à PostgreSQL (shared_buffers) ou les index sont à revoir.",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "caisse_oltp"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 0,
+        "y": 40
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#C00000",
+                "value": null
+              },
+              {
+                "color": "#ED7D31",
+                "value": 90
+              },
+              {
+                "color": "#548235",
+                "value": 99
+              }
+            ]
+          },
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "caisse_oltp"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT round(100.0 * blks_hit / NULLIF(blks_hit + blks_read, 0), 2) AS \"Cache\"\nFROM pg_stat_database\nWHERE datname = current_database()"
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "type": "stat",
+      "title": "Taille de la base transactionnelle",
+      "description": "Espace disque occupé par la base transactionnelle (données, index et tables d'audit).",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "caisse_oltp"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 8,
+        "y": 40
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#1F3864",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "caisse_oltp"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT pg_database_size(current_database()) AS \"Taille\""
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "type": "stat",
+      "title": "Taille de l'entrepôt analytique",
+      "description": "Espace disque occupé par l'entrepôt (faits partitionnés, dimensions, agrégats et vues matérialisées).",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "entrepot_dwh"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 16,
+        "y": 40
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#1F3864",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "entrepot_dwh"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT pg_database_size(current_database()) AS \"Taille\""
+        }
+      ]
+    }
+  ],
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  }
+}

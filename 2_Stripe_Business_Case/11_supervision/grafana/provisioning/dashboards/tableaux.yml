@@ -1,0 +1,14 @@
+# Chargement automatique des tableaux de bord versionnés - Stripe Business Case
+# Toute modification faite dans l'interface est refusée : la référence reste le fichier JSON du dépôt.
+
+apiVersion: 1
+
+providers:
+  - name: Tableaux de bord du projet
+    folder: Stripe Business Case
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    updateIntervalSeconds: 60
+    options:
+      path: /etc/grafana/tableaux_de_bord

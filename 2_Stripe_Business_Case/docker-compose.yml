@@ -13,6 +13,8 @@ services:
 
   # Base transactionnelle (OLTP) : PostgreSQL en mode réplication logique pour Debezium
   # max_slot_wal_keep_size : plafond du journal conservé pour un slot non lu (protection du disque)
+  # shared_buffers : mémoire de cache portée à 512 Mo (128 Mo par défaut, inférieurs à la taille de la base),
+  # après détection d'un taux de lecture en cache insuffisant par la supervision
   # TLS : la clé privée est copiée avec les droits exigés par PostgreSQL (propriétaire postgres,
   # lecture réservée), un montage depuis Windows ne permettant pas de les appliquer directement
   postgres-oltp:
@@ -30,6 +32,7 @@ services:
           -c max_wal_senders=10 \
           -c max_replication_slots=10 \
           -c max_slot_wal_keep_size=2GB \
+          -c shared_buffers=512MB \
           -c hba_file=/etc/postgresql/pg_hba.conf \
           -c ssl=on \
           -c ssl_cert_file=/var/lib/postgresql/tls/serveur.crt \
@@ -44,6 +47,7 @@ services:
       APP_PAIEMENTS_PASSWORD: ${APP_PAIEMENTS_PASSWORD}
       FLUX_TEMPS_REEL_PASSWORD: ${FLUX_TEMPS_REEL_PASSWORD}
       ORCHESTRATEUR_OLTP_PASSWORD: ${ORCHESTRATEUR_OLTP_PASSWORD}
+      SUPERVISION_OLTP_PASSWORD: ${SUPERVISION_OLTP_PASSWORD}
     volumes:
       - oltp-data:/var/lib/postgresql/data
       - ./04_oltp_postgresql/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
@@ -95,6 +99,7 @@ services:
       CHARGEMENT_DWH_PASSWORD: ${CHARGEMENT_DWH_PASSWORD}
       ANALYSTE_DWH_PASSWORD: ${ANALYSTE_DWH_PASSWORD}
       AUDITEUR_DWH_PASSWORD: ${AUDITEUR_DWH_PASSWORD}
+      SUPERVISION_DWH_PASSWORD: ${SUPERVISION_DWH_PASSWORD}
     volumes:
       - dwh-data:/var/lib/postgresql/data
       - ./05_olap_entrepot:/docker-entrypoint-initdb.d:ro
@@ -372,6 +377,35 @@ services:
     ports:
       - "18082:8081"
 
+  # Supervision de l'infrastructure : tableau de bord Grafana, entièrement décrit par fichiers
+  # (sources de données et tableau de bord versionnés dans 11_supervision), comptes de lecture seule,
+  # connexion chiffrée et vérifiée (verify-full) à la base transactionnelle
+  grafana:
+    image: grafana/grafana:13.2.3
+    container_name: stripe-grafana
+    depends_on:
+      postgres-oltp:
+        condition: service_healthy
+      postgres-dwh:
+        condition: service_healthy
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_USERS_DEFAULT_LANGUAGE: fr-FR
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/tableaux_de_bord/supervision_infrastructure.json
+      SUPERVISION_OLTP_PASSWORD: ${SUPERVISION_OLTP_PASSWORD}
+      SUPERVISION_DWH_PASSWORD: ${SUPERVISION_DWH_PASSWORD}
+    volumes:
+      - ./11_supervision/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./11_supervision/grafana/tableaux_de_bord:/etc/grafana/tableaux_de_bord:ro
+      - ./08_securite_conformite/certificats/ca.crt:/etc/grafana/certificats/ca.crt:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "13000:3000"
+    restart: unless-stopped
+
 volumes:
   oltp-data:
   oltp-replica-data:
@@ -379,3 +413,4 @@ volumes:
   airflow-db-data:
   airflow-logs:
   mongo-data:
+  grafana-data:

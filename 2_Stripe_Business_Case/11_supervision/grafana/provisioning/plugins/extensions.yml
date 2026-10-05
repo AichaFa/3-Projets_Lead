@@ -1,0 +1,7 @@
+# Extensions de Grafana - Stripe Business Case
+# Aucune extension ajoutée : le tableau de bord n'utilise que les fonctions intégrées de Grafana
+# (source PostgreSQL, alertes), ce qui limite la surface d'attaque et les mises à jour à suivre.
+
+apiVersion: 1
+
+apps: []

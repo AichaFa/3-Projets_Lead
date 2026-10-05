@@ -195,6 +195,9 @@ def charger_faits():
         source.execute(SQL_PAIEMENTS_MODIFIES, {"depuis": depuis})
         lignes = source.fetchall()
         if not lignes:
+            # Aucun paiement modifié : passage enregistré quand même (zéro ligne), pour que la
+            # supervision distingue « rien à charger » d'une chaîne de chargement arrêtée
+            cible.execute("UPDATE suivi_chargements SET nb_lignes = 0, date_execution = now() WHERE flux = 'transactions'")
             return []
 
         cles = _correspondances(cible)

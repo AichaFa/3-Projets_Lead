@@ -1,0 +1,313 @@
+# Règles d'alerte de la supervision - Stripe Business Case
+#
+# Évaluées en continu par Grafana, même sans consultation du tableau de bord (gestion proactive).
+# Chaque règle : requête A (série temporelle, format exigé par l'alerte sur PostgreSQL), réduction B
+# à la dernière valeur, seuil C. « for » : durée pendant laquelle la condition doit persister avant
+# déclenchement, pour éviter les alertes passagères. noDataState : Alerting lorsque l'absence de
+# résultat signale elle-même une panne (slot, réplica ou suivi absents), OK sinon.
+# Notifications : l'environnement de démonstration ne dispose pas de serveur de messagerie ; les
+# alertes sont consultables dans le menu Alerte de Grafana (architecture cible : courriel et
+# messagerie d'équipe).
+
+apiVersion: 1
+groups:
+- orgId: 1
+  name: Infrastructure de données
+  folder: Stripe Business Case
+  interval: 1m
+  rules:
+  - uid: capture-interrompue
+    title: Capture des changements interrompue
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: caisse_oltp
+      model:
+        refId: A
+        datasource:
+          type: grafana-postgresql-datasource
+          uid: caisse_oltp
+        editorMode: code
+        format: time_series
+        rawQuery: true
+        rawSql: 'SELECT now() AS time, CASE WHEN active THEN 0 ELSE 1 END AS deconnecte
+
+          FROM pg_replication_slots
+
+          WHERE slot_name = ''slot_stripe_cdc'''
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 0
+    noDataState: Alerting
+    execErrState: Error
+    for: 2m
+    isPaused: false
+    labels:
+      severite: critique
+      projet: stripe
+    annotations:
+      summary: Debezium n'est plus connecté à son slot de réplication.
+      description: Les nouveaux paiements ne sont plus transmis à Kafka ni notés par le modèle de fraude. Ils s'accumulent dans le journal de la base transactionnelle (plafond de 2 Go). Vérifier l'état
+        du connecteur et relancer sa tâche.
+  - uid: entrepot-non-alimente
+    title: Entrepôt analytique non alimenté
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: entrepot_dwh
+      model:
+        refId: A
+        datasource:
+          type: grafana-postgresql-datasource
+          uid: entrepot_dwh
+        editorMode: code
+        format: time_series
+        rawQuery: true
+        rawSql: 'SELECT now() AS time, extract(epoch FROM now() - date_execution) / 60 AS minutes
+
+          FROM suivi_chargements
+
+          WHERE flux = ''transactions'''
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 35
+    noDataState: Alerting
+    execErrState: Error
+    for: 1m
+    isPaused: false
+    labels:
+      severite: avertissement
+      projet: stripe
+    annotations:
+      summary: Aucun passage du chargement incrémental depuis plus de 35 minutes.
+      description: 'Au moins deux passages de la chaîne etl_entrepot (toutes les 15 minutes) ont été manqués : les analyses ne sont plus à jour. Vérifier l''état d''Airflow et de la chaîne de tâches.'
+  - uid: paiements-sans-score
+    title: Paiements sans score de fraude
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: caisse_oltp
+      model:
+        refId: A
+        datasource:
+          type: grafana-postgresql-datasource
+          uid: caisse_oltp
+        editorMode: code
+        format: time_series
+        rawQuery: true
+        rawSql: "SELECT now() AS time, count(*) AS en_attente\nFROM transactions\nWHERE score_anomalie IS NULL\n  AND date_heure BETWEEN now() - interval '1 hour' AND now() - interval '30 seconds'"
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 20
+    noDataState: OK
+    execErrState: Error
+    for: 2m
+    isPaused: false
+    labels:
+      severite: critique
+      projet: stripe
+    annotations:
+      summary: Plus de 20 paiements récents attendent leur score de fraude.
+      description: 'Le consommateur temps réel est arrêté ou en retard : les paiements ne sont plus évalués. Vérifier le consommateur, Kafka et la capture des changements.'
+  - uid: derive-modele-fraude
+    title: Dérive du modèle de fraude
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: caisse_oltp
+      model:
+        refId: A
+        datasource:
+          type: grafana-postgresql-datasource
+          uid: caisse_oltp
+        editorMode: code
+        format: time_series
+        rawQuery: true
+        rawSql: "SELECT now() AS time,\n       CASE WHEN count(*) >= 50\n            THEN 100.0 * count(*) FILTER (WHERE score_anomalie >= 0.8) / count(*) END AS part_bloquee\nFROM transactions\nWHERE date_heure\
+          \ >= now() - interval '1 hour'"
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 15
+    noDataState: OK
+    execErrState: Error
+    for: 10m
+    isPaused: false
+    labels:
+      severite: avertissement
+      projet: stripe
+    annotations:
+      summary: Plus de 15 % de paiements bloqués sur la dernière heure.
+      description: 'La part de paiements bloqués s''écarte nettement de celle mesurée à l''évaluation (1,2 %) : dérive des données, attaque en cours ou modèle à réentraîner. Calcul effectué à partir de
+        50 paiements sur l''heure, pour éviter les fausses alertes.'
+  - uid: replica-en-retard
+    title: Réplica en retard ou déconnecté
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: caisse_oltp
+      model:
+        refId: A
+        datasource:
+          type: grafana-postgresql-datasource
+          uid: caisse_oltp
+        editorMode: code
+        format: time_series
+        rawQuery: true
+        rawSql: 'SELECT now() AS time, pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn) AS retard_octets
+
+          FROM pg_stat_replication
+
+          WHERE pid NOT IN (SELECT active_pid FROM pg_replication_slots WHERE slot_type = ''logical'' AND active_pid IS NOT NULL)'
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 104857600
+    noDataState: Alerting
+    execErrState: Error
+    for: 5m
+    isPaused: false
+    labels:
+      severite: critique
+      projet: stripe
+    annotations:
+      summary: Le réplica accuse plus de 100 Mo de retard, ou n'est plus connecté.
+      description: En cas de panne de la base transactionnelle, la bascule sur le réplica entraînerait une perte des transactions non répliquées. Vérifier le réplica et le réseau.

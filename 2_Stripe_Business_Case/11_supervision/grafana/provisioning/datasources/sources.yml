@@ -1,0 +1,42 @@
+# Sources de données du tableau de bord de supervision - Stripe Business Case
+#
+# Comptes dédiés en lecture seule (svc_grafana, svc_grafana_dwh) ; mots de passe transmis par
+# variables d'environnement ($__env{...}), jamais écrits dans ce fichier.
+# Base transactionnelle : chiffrement TLS avec vérification complète du serveur (verify-full),
+# certificat de l'autorité du projet monté en lecture seule dans le conteneur.
+
+apiVersion: 1
+
+datasources:
+  - name: Base transactionnelle
+    uid: caisse_oltp
+    type: grafana-postgresql-datasource
+    url: postgres-oltp:5432
+    user: svc_grafana
+    isDefault: true
+    editable: false
+    secureJsonData:
+      password: $__env{SUPERVISION_OLTP_PASSWORD}
+    jsonData:
+      database: stripe_oltp
+      sslmode: verify-full
+      tlsConfigurationMethod: file-path
+      sslRootCertFile: /etc/grafana/certificats/ca.crt
+      postgresVersion: 1500
+      maxOpenConns: 5
+      timeInterval: 1m
+
+  - name: Entrepôt analytique
+    uid: entrepot_dwh
+    type: grafana-postgresql-datasource
+    url: postgres-dwh:5432
+    user: svc_grafana_dwh
+    editable: false
+    secureJsonData:
+      password: $__env{SUPERVISION_DWH_PASSWORD}
+    jsonData:
+      database: stripe_dwh
+      sslmode: disable
+      postgresVersion: 1500
+      maxOpenConns: 5
+      timeInterval: 1m
