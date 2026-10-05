@@ -101,7 +101,7 @@ s.fleche([(t_r["droite"], t_r["cy"]), (t_s["gauche"], t_s["cy"])])
 s.note(1160, 1060, 1025, "Règle champion / challenger", [
     "Une nouvelle version n'est activée que si elle fait mieux que la version en service",
     "  sur des données jamais vues ; sinon, elle reste candidate dans le registre des modèles",
-    "Dérive : part de paiements bloqués en production comparée à l'évaluation ; alerte consignée dans",
-    "  les journaux techniques si l'écart dépasse le double (Grafana la surveille aussi en continu)"], couleur="#7030A0")
+    "Dérive : part de paiements bloqués en production comparée à l'évaluation ; alerte consignée dans les",
+    "  journaux si elle double ou diminue de moitié (Grafana surveille aussi la dérive en continu)"], couleur="#7030A0")
 
 s.enregistrer(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "05_pipeline"))
