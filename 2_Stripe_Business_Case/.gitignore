@@ -12,3 +12,6 @@ logs/
 
 # Clés privées des certificats TLS (seuls les certificats publics peuvent être versionnés)
 *.key
+
+# Fichiers de travail personnels (notes de tournage)
+10_captures/Tuto Video Stripe*.xlsx
