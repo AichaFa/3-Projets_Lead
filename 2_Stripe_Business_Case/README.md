@@ -12,6 +12,7 @@ Architecture de données complète pour une plateforme de paiement : base transa
 |---|---|
 | [Dossier de projet (PDF)](02_dossier_projet/Dossier_de_projet_Stripe.pdf) | Cahier des charges, conception détaillée, sécurité, intelligence artificielle, résultats et architecture cible (51 pages) |
 | [Présentation (PowerPoint)](01_presentation/Presentation_Stripe.pptx) | Support de soutenance de 5 minutes et annexes |
+| [Vidéo de démonstration](10_captures/video/pipeline_en_fonctionnement.mp4) | Le pipeline en fonctionnement : infrastructure, flux temps réel, Kafka, MongoDB, Airflow, supervision et intégration des trois bases |
 | [Diagrammes](03_diagrammes) | Sept diagrammes (PNG et SVG) et leurs programmes sources |
 
 ## Livrables
