@@ -15,6 +15,12 @@ Architecture de données complète pour une plateforme de paiement : base transa
 | [Vidéo de démonstration](10_captures/video/pipeline_en_fonctionnement.mp4) | Le pipeline en fonctionnement : infrastructure, flux temps réel, Kafka, MongoDB, Airflow, supervision et intégration des trois bases |
 | [Diagrammes](03_diagrammes) | Sept diagrammes (PNG et SVG) et leurs programmes sources |
 
+Vidéo :
+
+
+Uploading pipeline_en_fonctionnement.mp4…
+
+
 ## Livrables
 
 | Livrable | Emplacement |
