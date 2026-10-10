@@ -18,7 +18,7 @@ Architecture de données complète pour une plateforme de paiement : base transa
 Vidéo :
 
 
-Uploading pipeline_en_fonctionnement.mp4…
+https://github.com/user-attachments/assets/0645c691-f8b4-411f-9ec5-bd08b09c1e89
 
 
 ## Livrables
