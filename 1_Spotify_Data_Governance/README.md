@@ -1,6 +1,6 @@
-# 🎧 Spotify - Cadre de gouvernance des données
+# Spotify - Cadre de gouvernance des données
 
-![Data Governance](https://img.shields.io/badge/Data%20Governance-1DB954?style=for-the-badge&logo=spotify&logoColor=white)
+![Data Governance](https://img.shields.io/badge/Data%20Governance-1F3864?style=for-the-badge)
 ![Compliance](https://img.shields.io/badge/Conformit%C3%A9-RGPD%20|%20CCPA%20|%20PCI--DSS-1F3864?style=for-the-badge)
 ![Case Study](https://img.shields.io/badge/Cas%20d'%C3%A9tude-Gouvernance%20des%20donn%C3%A9es-2E5496?style=for-the-badge)
 
@@ -55,8 +55,9 @@ Ce projet conçoit un cadre de gouvernance pour répondre à ces défis, tout en
 | **DPO & équipe juridique** | Conformité, protection des données et gestion des risques |
 | **Data Stewards** (par domaine) | Qualité et accès au plus près de la donnée (ingénierie, marketing, produit, curation) |
 | **Data Steward IA** | Surveillance des biais et qualité des données d'entraînement |
+| **Directions métier** (ingénierie, marketing, produit) | Propriétaires des données de leur domaine |
 
-> Logique **RACI** : pour chaque activité, un responsable unique répond du résultat.
+> Matrice **RACI** (dans la politique) : pour chaque activité, plusieurs acteurs peuvent réaliser le travail, mais une seule personne en répond, le A (*Accountable*).
 
 ### Le modèle cible : un centre d'excellence
 
@@ -64,7 +65,7 @@ Le modèle est atteint par une trajectoire progressive :
 
 **Socle centralisé** → **Pilote embarqué** → **Centre d'excellence** fédéré
 
-La coordination centrale préserve une source unique de vérité, tandis que les *Data Stewards* embarqués apportent l'agilité aux métiers.
+La coordination centrale préserve une source unique de vérité, tandis que les *Data Stewards* embarqués garantissent la qualité au plus près de la donnée.
 
 ### Socle technologique - *acheter ou construire*
 
@@ -82,7 +83,8 @@ Chaque livrable est disponible en version bureautique (Word / PowerPoint) et en 
 - **Organigramme des rôles** - l'organisation cible.
 - **Plan de mise en œuvre** - modèle, outils et projet pilote.
 - **Présentation** - synthèse en diapositives pour l'équipe dirigeante.
-- **Guide de questions-réponses** - anticipation des questions d'un comité de direction.
+
+Le dossier `versions_docx_ppt` contient également le **guide de questions-réponses pour les dirigeants**, fourni par l'énoncé, qui recense les questions susceptibles d'être posées lors de la présentation.
 
 ---
 
