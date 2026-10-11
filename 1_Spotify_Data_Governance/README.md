@@ -84,8 +84,6 @@ Chaque livrable est disponible en version bureautique (Word / PowerPoint) et en 
 - **Plan de mise en œuvre** - modèle, outils et projet pilote.
 - **Présentation** - synthèse en diapositives pour l'équipe dirigeante.
 
-Le dossier `versions_docx_ppt` contient également le **guide de questions-réponses pour les dirigeants**, fourni par l'énoncé, qui recense les questions susceptibles d'être posées lors de la présentation.
-
 ---
 
 ## Auteur
