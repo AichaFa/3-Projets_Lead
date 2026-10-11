@@ -40,6 +40,7 @@ L'équipe métier a exprimé deux besoins, auxquels l'infrastructure répond dir
 ## Architecture
 
 L'ensemble fonctionne en local grâce à Docker. Le parcours de la donnée suit un processus ETL (Extraire, Transformer, Charger), déclenché chaque minute par Airflow.
+
 ### Vue d'ensemble
 
 <img src="docs/captures/architecture_ensemble.png" alt="Vue d'ensemble de l'infrastructure" width="50%">
@@ -47,12 +48,15 @@ L'ensemble fonctionne en local grâce à Docker. Le parcours de la donnée suit 
 ### Le flux ETL, chaque minute
 
 <img src="docs/captures/flux_etl.png" alt="Flux ETL du DAG d'ingestion" width="50%">
-    Sources (historique + API temps réel)
-        -> Entraînement du modèle (scikit-learn), rangé dans MLflow
-        -> DAG d'ingestion Airflow (chaque minute) : extraction, contrôle
-           qualité, prédiction, chargement
-        -> Stockage PostgreSQL (transactions, quarantaine, suivi)
-        -> Notifications : alerte de fraude et bilan quotidien
+
+```text
+Sources (historique + API temps réel)
+    -> Entraînement du modèle (scikit-learn), rangé dans MLflow
+    -> DAG d'ingestion Airflow (chaque minute) : extraction, contrôle
+       qualité, prédiction, chargement
+    -> Stockage PostgreSQL (transactions, quarantaine, suivi)
+    -> Notifications : alerte de fraude et bilan quotidien
+```
 
 Les schémas détaillés (vue d'ensemble et flux ETL) sont disponibles dans le dossier `docs/` et dans la présentation.
 
@@ -75,7 +79,7 @@ Les schémas détaillés (vue d'ensemble et flux ETL) sont disponibles dans le d
 
 - Infrastructure locale reproductible avec Docker ; le passage au cloud reste une évolution possible.
 - Bases de données isolées : un compte par base, selon le principe du moindre privilège.
-- Données personnelles écartées du modèle (nom, adresse, numéro de carte anonymisé) ; conformité au RGPD.
+- Données identifiantes écartées du modèle (nom, adresse, numéro de carte anonymisé) ; conformité au RGPD.
 - Contrôle qualité des données avec mise en quarantaine des paiements douteux.
 - Surveillance du pipeline : chaque passage est tracé (volume, rejets, durée de traitement).
 - Modèle versionné dans MLflow, rechargeable et réentraînable.
@@ -85,6 +89,12 @@ Les schémas détaillés (vue d'ensemble et flux ETL) sont disponibles dans le d
 - Précision du modèle : 96 %.
 - Rappel (fraudes détectées) : 70 %.
 - Pipeline fonctionnant en continu, un paiement traité chaque minute.
+
+## Limites et pistes d'amélioration
+
+- Le modèle utilise le sexe et l'âge du client, présents dans le jeu de données. Ces variables sensibles feront l'objet d'un contrôle d'équité (taux de fausses alertes par groupe) et seront retirées si elles n'apportent pas de gain significatif, conformément au principe de minimisation du RGPD.
+- Le seuil de décision est celui par défaut (0,5) ; il sera ajusté avec le métier selon le coût d'une fraude manquée face à celui d'une fausse alerte.
+- L'alerte de fraude est aujourd'hui visible dans les journaux d'Airflow ; un envoi par e-mail ou messagerie est l'évolution prévue.
 
 ## Technologies
 
