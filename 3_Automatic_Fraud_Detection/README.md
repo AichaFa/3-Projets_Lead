@@ -79,7 +79,7 @@ Les schémas détaillés (vue d'ensemble et flux ETL) sont disponibles dans le d
 
 - Infrastructure locale reproductible avec Docker ; le passage au cloud reste une évolution possible.
 - Bases de données isolées : un compte par base, selon le principe du moindre privilège.
-- Données identifiantes écartées du modèle (nom, adresse, numéro de carte anonymisé) ; conformité au RGPD.
+- Données identifiantes écartées du modèle (nom, adresse, numéro de carte) ; numéro de carte masqué en base, seuls les quatre derniers chiffres étant conservés ; conformité au RGPD.
 - Contrôle qualité des données avec mise en quarantaine des paiements douteux.
 - Surveillance du pipeline : chaque passage est tracé (volume, rejets, durée de traitement).
 - Modèle versionné dans MLflow, rechargeable et réentraînable.
