@@ -28,6 +28,21 @@ URI_MLFLOW = "http://mlflow:5000"
 
 logger = logging.getLogger("ingestion_paiements")
 
+# Données identifiantes retirées dès l'extraction : aucune tâche en aval
+# (quarantaine, prédiction, journaux, XCom d'Airflow) ne les reçoit.
+# Le numéro de carte est remplacé par sa version masquée (quatre derniers
+# chiffres). Les champs utiles au modèle sont conservés afin de pouvoir
+# corriger puis rejouer un paiement mis en quarantaine.
+CHAMPS_IDENTIFIANTS = ("first", "last", "street", "city", "state", "zip", "job")
+
+
+def masquer_paiement(paiement: dict) -> dict:
+    """Retourne une copie du paiement sans données identifiantes, carte masquée."""
+    masque = {cle: valeur for cle, valeur in paiement.items() if cle not in CHAMPS_IDENTIFIANTS}
+    carte = masque.pop("cc_num", None)
+    masque["cc_pseudo"] = f"****{str(carte)[-4:]}" if carte is not None else None
+    return masque
+
 
 @dag(
     dag_id="ingestion_paiements",
@@ -48,7 +63,7 @@ def ingestion_paiements():
             charge = json.loads(charge)
         colonnes = charge["columns"]
         valeurs = charge["data"][0]
-        paiement = dict(zip(colonnes, valeurs))
+        paiement = masquer_paiement(dict(zip(colonnes, valeurs)))
         paiement["_debut_traitement"] = time.monotonic()
         return paiement
 
@@ -102,7 +117,7 @@ def ingestion_paiements():
         ligne = prepare.iloc[0]
         return {
             "ignore": False,
-            "cc_pseudo": f"****{str(paiement.get('cc_num', ''))[-4:]}",
+            "cc_pseudo": paiement.get("cc_pseudo"),
             "amt": float(ligne["amt"]),
             "category": str(ligne["category"]),
             "gender": str(ligne["gender"]),
