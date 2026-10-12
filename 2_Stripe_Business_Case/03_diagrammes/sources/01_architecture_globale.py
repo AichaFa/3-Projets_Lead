@@ -24,14 +24,14 @@ debezium = s.boite(COL[2], R1, L, 130, "Capture des changements", "Debezium 3.7"
 kafka = s.boite(COL[3], R1, L, 130, "Diffusion", "Kafka 4.3 (KRaft)",
                 ["sujet stripe.public.transactions", "clé = client : ordre garanti", "relecture possible"], couche="flux")
 conso = s.boite(COL[4], R1, L, 130, "Traitement temps réel", "Consommateur",
-                ["10 indices, score, décision", "recommandations de produits", "lit taux et clients dans la caisse"], couche="ia")
+                ["10 indices, score, décision", "recommandations de produits", "lit taux et clients dans la base OLTP"], couche="ia")
 mongo = s.boite(COL[5], R1, L, 130, "Base NoSQL", "MongoDB 8.0",
                 ["7 collections avec validation", "paiements enrichis, profils", "modèles (GridFS), journaux"], couche="nosql")
 
 replica = s.boite(COL[0], R2, L, 125, "Continuité d'activité", "Réplica PostgreSQL",
                   ["réplication physique en continu", "reprise après sinistre"], couche="oltp")
 service = s.boite(COL[4], R2, L, 125, "Apprentissage automatique", "Service d'entraînement",
-                  ["FastAPI, réseau interne", "historique lu dans la caisse (TLS)", "règle champion / challenger"], couche="ia")
+                  ["FastAPI, réseau interne", "historique lu dans la base OLTP (TLS)", "règle champion / challenger"], couche="ia")
 
 rapports = s.boite(COL[0], R3, L, 130, "Conformité", "Rapport quotidien",
                    ["13 contrôles RGPD et PCI-DSS", "rapport daté, versionné"], couche="gouvernance")

@@ -93,7 +93,7 @@ couches = [
     ("Authentification", "gouvernance", ["Comptes dédiés, mots de passe vérifiés par SCRAM-SHA-256 ;",
                                           "secrets hors du code et du dépôt (fichier .env exclu de Git)"]),
     ("Autorisation", "gouvernance", ["Contrôle d'accès par rôles : droits par table, par colonne et par",
-                                      "collection ; aucun compte de service ne peut supprimer dans la caisse ni MongoDB"]),
+                                      "collection ; aucun compte de service ne peut supprimer dans la base transactionnelle ni MongoDB"]),
     ("Données", "nosql", ["E-mails chiffrés (pgcrypto), cartes remplacées par un jeton,",
                           "minimisation dans l'entrepôt, adresse IP hors du flux"]),
     ("Traçabilité", "olap", ["Journal d'audit non modifiable (déclencheurs),",
