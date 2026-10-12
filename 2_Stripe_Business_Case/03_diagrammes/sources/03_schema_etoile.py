@@ -12,7 +12,7 @@ VERT, VERT_FONCE_FOND = COUCHES["olap"][0], "#C6E0B4"
 
 s = Schema(2180, 1110, "Schéma en étoile de l'entrepôt analytique",
            "Une table de faits (un paiement par ligne) entourée de sept dimensions - PK : clé primaire, FK : clé étrangère, "
-           "UQ : clé naturelle de la base transactionnelle, M : mesure")
+           "UQ : clé naturelle de la base transactionnelle, M : mesure - cercle et patte : zéro ou plusieurs, double trait : exactement un")
 
 faits = s.table(650, 420, 400, "fait_transactions", "Table de faits - grain : un paiement", [
     ("PK", "transaction_id", "UUID"), ("PK FK", "date_cle", "INT"), ("FK", "client_cle", "INT"), ("FK", "marchand_cle", "INT"),
@@ -47,18 +47,20 @@ def ligne(table, colonne):
     return table["lignes"][colonne]
 
 c = VERT
-s.relation([(faits["cx"], faits["haut"]), (dates["cx"], dates["bas"])], c)
+# Côté faits : zéro ou plusieurs paiements par ligne de dimension (cercle et patte de corbeau) ;
+# côté dimension : exactement une ligne par paiement (lignes 0 « sans produit » et « inconnu » comprises)
+s.relation([(faits["cx"], faits["haut"]), (dates["cx"], dates["bas"])], c, minimum_zero=True)
 s.relation([(faits["gauche"], ligne(faits, "client_cle")), (540, ligne(faits, "client_cle")), (540, ligne(clients, "client_cle")),
-            (clients["droite"], ligne(clients, "client_cle"))], c)
+            (clients["droite"], ligne(clients, "client_cle"))], c, minimum_zero=True)
 s.relation([(faits["gauche"], ligne(faits, "moyen_paiement_cle")), (585, ligne(faits, "moyen_paiement_cle")),
-            (585, ligne(moyens, "moyen_paiement_cle")), (moyens["droite"], ligne(moyens, "moyen_paiement_cle"))], c)
+            (585, ligne(moyens, "moyen_paiement_cle")), (moyens["droite"], ligne(moyens, "moyen_paiement_cle"))], c, minimum_zero=True)
 s.relation([(faits["droite"], ligne(faits, "marchand_cle")), (1110, ligne(faits, "marchand_cle")), (1110, ligne(marchands, "marchand_cle")),
-            (marchands["gauche"], ligne(marchands, "marchand_cle"))], c)
+            (marchands["gauche"], ligne(marchands, "marchand_cle"))], c, minimum_zero=True)
 s.relation([(faits["droite"], ligne(faits, "produit_cle")), (1150, ligne(faits, "produit_cle")), (1150, ligne(produits, "produit_cle")),
-            (produits["gauche"], ligne(produits, "produit_cle"))], c)
+            (produits["gauche"], ligne(produits, "produit_cle"))], c, minimum_zero=True)
 s.relation([(faits["droite"], ligne(faits, "geographie_ip_cle")), (1080, ligne(faits, "geographie_ip_cle")),
-            (1080, ligne(geographie, "geographie_cle")), (geographie["gauche"], ligne(geographie, "geographie_cle"))], c)
-s.relation([(faits["cx"], faits["bas"]), (devises["cx"], devises["haut"])], c)
+            (1080, ligne(geographie, "geographie_cle")), (geographie["gauche"], ligne(geographie, "geographie_cle"))], c, minimum_zero=True)
+s.relation([(faits["cx"], faits["bas"]), (devises["cx"], devises["haut"])], c, minimum_zero=True)
 
 # Tables complémentaires
 audit = s.table(1600, 150, 520, "fait_audit", "Seconde table de faits - audit", [

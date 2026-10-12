@@ -127,11 +127,13 @@ class Schema:
         return {"x": x, "y": y, "l": l, "h": h, "cx": x + l / 2, "cy": y + h / 2, "haut": y, "bas": y + h,
                 "gauche": x, "droite": x + l, "lignes": lignes}
 
-    def relation(self, points, couleur):
-        """Relation un à plusieurs : patte de corbeau au départ (côté plusieurs), double trait à l'arrivée (côté un)."""
+    def relation(self, points, couleur, minimum_zero=False):
+        """Relation un à plusieurs : patte de corbeau au départ (côté plusieurs), double trait à l'arrivée (côté un).
+        minimum_zero : cercle ajouté après la patte de corbeau (zéro ou plusieurs)."""
+        depart = "zero_plusieurs" if minimum_zero else "plusieurs"
         chemin = " ".join(f"{'M' if i == 0 else 'L'}{x},{y}" for i, (x, y) in enumerate(points))
         self.dessus.append(f'<path d="{chemin}" fill="none" stroke="{couleur}" stroke-width="1.8" stroke-linejoin="round" '
-                           f'marker-start="url(#plusieurs)" marker-end="url(#un)"/>')
+                           f'marker-start="url(#{depart})" marker-end="url(#un)"/>')
 
     def note(self, x, y, l, titre, lignes, couleur=BLEU_MARINE):
         h = 34 + len(lignes) * 19 + 8
@@ -176,6 +178,10 @@ class Schema:
         marqueurs += ('<marker id="plusieurs" viewBox="0 0 16 16" refX="0" refY="8" markerWidth="16" markerHeight="16" '
                       'markerUnits="userSpaceOnUse" orient="auto"><path d="M0,1 L15,8 M0,8 L15,8 M0,15 L15,8" '
                       'stroke="#262626" stroke-width="1.6" fill="none"/></marker>'
+                      '<marker id="zero_plusieurs" viewBox="0 0 30 16" refX="0" refY="8" markerWidth="30" markerHeight="16" '
+                      'markerUnits="userSpaceOnUse" orient="auto"><path d="M0,1 L15,8 M0,8 L15,8 M0,15 L15,8" '
+                      'stroke="#262626" stroke-width="1.6" fill="none"/><circle cx="22" cy="8" r="5" fill="white" '
+                      'stroke="#262626" stroke-width="1.6"/></marker>'
                       '<marker id="un" viewBox="0 0 16 16" refX="15" refY="8" markerWidth="16" markerHeight="16" '
                       'markerUnits="userSpaceOnUse" orient="auto"><path d="M7,1 L7,15 M11,1 L11,15" stroke="#262626" '
                       'stroke-width="1.6" fill="none"/></marker>')
