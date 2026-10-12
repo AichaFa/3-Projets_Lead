@@ -94,10 +94,17 @@ def generer():
     for nom, (categorie, colonnes) in TABLES.items():
         dot.append(f"  {nom} [label={table_html(nom, categorie, colonnes)}];")
     for enfant, colonne, parent, facultatif in RELATIONS:
-        # Litige : contrainte d'unicité sur transaction_id, donc zéro ou un litige par paiement
-        queue = "teeodot" if enfant == "litiges" else ("crowodot" if facultatif else "crowtee")
+        # Côté enfant (porteur de la clé étrangère) : zéro ou plusieurs lignes par parent, car une clé
+        # étrangère n'impose aucun minimum ; litige : contrainte d'unicité, donc zéro ou un par paiement.
+        # Côté parent : exactement un si la clé étrangère est obligatoire, zéro ou un si elle est facultative.
+        # Symbole collé à la table : maximum ; symbole suivant : minimum.
+        queue = "teeodot" if enfant == "litiges" else "crowodot"
+        tete = "teeodot" if facultatif else "teetee"
         cle_parent = TABLES[parent][1][0][1]
-        dot.append(f'  {enfant}:{colonne}_d:e -> {parent}:{cle_parent}_g:w [arrowtail={queue}, arrowhead=teetee];')
+        # Relation facultative attachée au coin haut gauche de la clé primaire : ses symboles ne se
+        # superposent pas à ceux des relations obligatoires qui arrivent sur la même table
+        bord = "nw" if facultatif else "w"
+        dot.append(f'  {enfant}:{colonne}_d:e -> {parent}:{cle_parent}_g:{bord} [arrowtail={queue}, arrowhead={tete}];')
     # Notes : intégrité renforcée et journal d'audit
     notes = [
         ("note_integrite", "Intégrité renforcée", [
